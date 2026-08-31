@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATProto Observability Facts API</title>
+<meta name="description" content="Public, anonymous, read-only aggregate facts about the ATProto network, published with the coverage, freshness and observation adequacy that qualify them.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="api.neutral.zone">
+<meta property="og:title" content="ATProto Observability Facts API">
+<meta property="og:description" content="Public, anonymous, read-only aggregate facts about the ATProto network, published with the coverage, freshness and observation adequacy that qualify them.">
+<meta property="og:url" content="https://api.neutral.zone/atproto/">
+<meta property="og:image" content="https://api.neutral.zone/atproto/og-card.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="ATProto Observability Facts API - public, anonymous, read-only aggregate facts.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ATProto Observability Facts API">
+<meta name="twitter:description" content="Public, anonymous, read-only aggregate facts about the ATProto network, published with the coverage, freshness and observation adequacy that qualify them.">
+<meta name="twitter:image" content="https://api.neutral.zone/atproto/og-card.png">
+<style>
+  :root {
+    --bg:#fbfbfa; --fg:#1a1d21; --muted:#5c6570; --rule:#e2e5e9;
+    --card:#fff; --accent:#0f7a5f; --code-bg:#f4f6f8; --warn-bg:#fff8e6; --warn-br:#e8c766;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#0e1116; --fg:#eef1f5; --muted:#98a2ae; --rule:#262c34;
+      --card:#151a21; --accent:#72bfa8; --code-bg:#11161c; --warn-bg:#241f10; --warn-br:#6b5a24;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#0e1116; --fg:#eef1f5; --muted:#98a2ae; --rule:#262c34;
+    --card:#151a21; --accent:#72bfa8; --code-bg:#11161c; --warn-bg:#241f10; --warn-br:#6b5a24;
+  }
+  body { background:var(--bg); color:var(--fg); margin:0;
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  .wrap { max-width:860px; margin:0 auto; padding:48px 24px 96px; }
+  h1 { font-size:2.1rem; line-height:1.2; margin:0 0 8px; letter-spacing:-.02em; }
+  h2 { font-size:1.35rem; margin:48px 0 12px; letter-spacing:-.01em;
+       padding-top:20px; border-top:1px solid var(--rule); }
+  h3 { font-size:1.05rem; margin:28px 0 8px; }
+  .lede { font-size:1.12rem; color:var(--muted); margin:0 0 8px; }
+  code, pre { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13.5px; }
+  code { background:var(--code-bg); padding:1px 5px; border-radius:4px; }
+  pre { background:var(--code-bg); border:1px solid var(--rule); border-radius:8px;
+        padding:14px 16px; overflow-x:auto; }
+  pre code { background:none; padding:0; }
+  table { border-collapse:collapse; width:100%; margin:14px 0; display:block; overflow-x:auto; }
+  th,td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--rule); vertical-align:top; }
+  th { font-size:.82rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  td code { white-space:nowrap; }
+  a { color:var(--accent); }
+  .note { background:var(--warn-bg); border:1px solid var(--warn-br); border-radius:8px;
+          padding:12px 16px; margin:18px 0; }
+  .pill { display:inline-block; background:var(--card); border:1px solid var(--rule);
+          border-radius:999px; padding:2px 10px; font-size:.8rem; color:var(--muted); margin-right:6px; }
+  footer { margin-top:56px; padding-top:20px; border-top:1px solid var(--rule);
+           color:var(--muted); font-size:.9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>ATProto Observability Facts API</h1>
+<p class="lede">Public, anonymous, read-only aggregate facts about the ATProto network, published with the coverage, freshness and observation adequacy that qualify them.</p>
+<p>
+  <span class="pill">public</span><span class="pill">anonymous</span>
+  <span class="pill">read-only</span><span class="pill">no API key</span>
+  <span class="pill">CORS enabled</span>
+</p>
+
+<h2>What this is</h2>
+<p>
+  Several independent instruments watch the <a href="https://atproto.com">ATProto</a>
+  network and reduce what they see into aggregate facts. This API publishes those
+  facts. It is a thin publication layer: it reads artifacts the instruments have
+  already generated and serves them under a versioned contract. It does not run
+  queries against any instrument's operational database.
+</p>
+<p>
+  The distinguishing property is that <strong>every fact carries the limits of the
+  observation that produced it</strong>. How much of the estate was actually watched,
+  how fresh the reading is, and whether the observation had enough standing to
+  support a negative claim all travel with the data rather than being lost at the
+  boundary. If an instrument could not see something, you are told that, instead of
+  receiving a confident zero.
+</p>
+
+<h2>Quick start</h2>
+<pre><code>curl -s https://api.neutral.zone/atproto/v1/instruments
+curl -s https://api.neutral.zone/atproto/v1/labelwatch/overview
+curl -s https://api.neutral.zone/atproto/v1/weatherwatch/conditions
+curl -s https://api.neutral.zone/atproto/v1/weatherwatch/metrics</code></pre>
+<p>Conditional requests work; responses carry <code>ETag</code> and <code>Last-Modified</code>.</p>
+<pre><code>curl -s -H 'If-None-Match: "&lt;etag&gt;"' -o /dev/null -w '%{http_code}\n' \
+  https://api.neutral.zone/atproto/v1/labelwatch/overview
+# 304</code></pre>
+
+<h2>Contributing instruments</h2>
+<table>
+  <tr><th>Instrument</th><th>Observes</th><th>Published here</th></tr>
+  <tr><td><strong>Weatherwatch</strong></td>
+      <td>Aggregate network activity from a Jetstream vantage: event rates by
+          collection, and the health of the observation itself.</td>
+      <td>Yes</td></tr>
+  <tr><td><strong>Labelwatch</strong></td>
+      <td>Labeler behaviour: which labelers exist, whether they are reachable and
+          auditable, and estate-level anomalies in their labelling.</td>
+      <td>Yes</td></tr>
+  <tr><td><strong>Driftwatch</strong></td>
+      <td>Claim propagation, per subject.</td>
+      <td><strong>No.</strong> Its observations are per-subject and are deliberately
+          private. See <a href="#notpublished">what is not published</a>.</td></tr>
+</table>
+
+<h2>Endpoints</h2>
+<table>
+  <tr><th>Path</th><th>Returns</th></tr>
+  <tr><td><code>GET /atproto/v1/instruments</code></td>
+      <td>Which instruments contribute and whether each is readable right now.</td></tr>
+  <tr><td><code>GET /atproto/v1/labelwatch/overview</code></td>
+      <td>Labeler counts, reachability census, alert counts by rule, and the
+          estate-level weather verdict with its observation adequacy.</td></tr>
+  <tr><td><code>GET /atproto/v1/weatherwatch/conditions</code></td>
+      <td>Plain-language reading of current aggregate activity, with freshness and
+          interval coverage.</td></tr>
+  <tr><td><code>GET /atproto/v1/weatherwatch/metrics</code></td>
+      <td>Per-collection event totals and mean rates, with observed and unobserved
+          window counts.</td></tr>
+  <tr><td><code>GET /atproto/openapi.json</code></td>
+      <td>Machine-readable contract (OpenAPI 3.1).</td></tr>
+  <tr><td><code>GET /atproto/health</code></td>
+      <td>Liveness of this publication service. Says nothing about the instruments.</td></tr>
+</table>
+<p>
+  <code>GET</code> and <code>HEAD</code> only. Anything else returns
+  <code>405</code>. There are no write, admin, or per-subject routes, and there is
+  nothing to authenticate as.
+</p>
+
+<h2>The response envelope</h2>
+<p>Every fact response has the same outer shape.</p>
+<table>
+  <tr><th>Field</th><th>Meaning</th></tr>
+  <tr><td><code>contract</code></td>
+      <td>Stable identifier for the fact contract and its major version, e.g.
+          <code>atproto.facts.labelwatch.overview/v1</code>. Pin against this.</td></tr>
+  <tr><td><code>instrument</code></td><td>Which instrument produced the facts.</td></tr>
+  <tr><td><code>generated_at</code></td>
+      <td>When the <em>instrument</em> produced the underlying artifact. This is the
+          timestamp that matters for how current the facts are.</td></tr>
+  <tr><td><code>retrieved_at</code></td>
+      <td>When this service read that artifact to answer you. Always recent; not a
+          measure of data freshness.</td></tr>
+  <tr><td><code>age_seconds</code></td>
+      <td><code>retrieved_at</code> minus <code>generated_at</code>. How stale the
+          facts are, in one number.</td></tr>
+  <tr><td><code>facts</code></td><td>The observations themselves.</td></tr>
+  <tr><td><code>caveats</code></td>
+      <td>Limits that are part of the fact, not legal boilerplate. They state what
+          the instrument structurally cannot see.</td></tr>
+  <tr><td><code>provenance</code></td>
+      <td>How the facts were obtained, and an explicit
+          <code>does_not_measure</code> list where the instrument publishes one.</td></tr>
+  <tr><td><code>freshness</code></td>
+      <td>Present on Weatherwatch responses: the instrument's own freshness state
+          and the threshold it was judged against.</td></tr>
+</table>
+
+<h2>Time and window semantics</h2>
+<p>
+  All timestamps are UTC, ISO 8601. Three different times appear and they are not
+  interchangeable:
+</p>
+<ul>
+  <li><strong>Window</strong> — the interval the facts describe
+      (<code>facts.window.start</code> / <code>.end</code>). Aggregate counts and
+      rates belong to this interval and to no other.</li>
+  <li><strong>generated_at</strong> — when the instrument computed the reading.</li>
+  <li><strong>retrieved_at</strong> — when this API served it to you.</li>
+</ul>
+<p>
+  Windows are preserved exactly as the instrument produced them and are never
+  re-cut at serialization. Weatherwatch rates divide by <em>observed</em> duration,
+  not nominal window width; unobserved windows are omitted from rates rather than
+  interpolated across.
+</p>
+
+<h2>Coverage, adequacy and caveats</h2>
+<p>This is the part worth reading before you use the numbers.</p>
+
+<h3>Coverage</h3>
+<p>
+  <code>facts.window.coverage_ratio</code> is observed seconds divided by the span
+  of the window. A ratio below 1 means the instrument was not watching for part of
+  the interval. Counts are of what was <em>observed</em>, never an estimate of what
+  occurred.
+</p>
+
+<h3>Observation adequacy (Labelwatch)</h3>
+<p>
+  <code>facts.observation.adequacy</code> is one of <code>adequate</code>,
+  <code>partial</code>, or <code>unobserved</code>, and it qualifies the entire
+  reading. It exists because a window that saw nothing cannot report that nothing
+  happened.
+</p>
+<div class="note">
+  <strong>Negative claims are gated.</strong> When adequacy is <code>partial</code>
+  or <code>unobserved</code>, <code>network_weather.signals</code> will not contain
+  <code>calm</code>. It reports <code>under-observed</code> or
+  <code>unobserved</code> instead, and
+  <code>network_weather.supports_negative_claim</code> is <code>false</code>.
+  Positive findings still stand — an observed spike was observed — but the absence
+  of a finding is not published as evidence of absence.
+</div>
+<p>
+  Practically: if <code>supports_negative_claim</code> is <code>false</code>, do not
+  read a quiet result as "nothing is happening". Read it as "not enough was seen to
+  say".
+</p>
+
+<h3>Caveats</h3>
+<p>
+  <code>caveats</code> and <code>provenance.does_not_measure</code> describe
+  structural blind spots. Weatherwatch, for instance, counts events and not
+  accounts, so participant turnover is unavailable by construction rather than
+  merely unimplemented.
+</p>
+
+<h2 id="notpublished">What is not published</h2>
+<ul>
+  <li><strong>No subject identities.</strong> No DIDs, handles or
+      <code>at://</code> URIs of the people or records an instrument observed. No
+      stable identity hashes, and no groupings small enough to resolve to
+      individuals.</li>
+  <li><strong>No Driftwatch per-subject state.</strong> Driftwatch observes claim
+      propagation per subject. That is private, is not reachable from the internet,
+      and is not published here in any form.</li>
+  <li><strong>No raw collector payloads</strong>, no database access, no query
+      language, no filtering DSL.</li>
+  <li><strong>No internal storage, build or deployment state.</strong></li>
+  <li><strong>No write or control surface.</strong></li>
+</ul>
+<p>
+  <strong>Labeler DIDs are published</strong>, deliberately. A labeler is a public
+  moderation service with a discoverable endpoint, not a person, and the
+  instruments already publish these identifiers. That is the one identity-shaped
+  thing here, and it is a service identity.
+</p>
+<p>
+  Publication is an allow-list: each field is selected by name. A new field
+  appearing inside an instrument cannot reach this API without someone adding it on
+  purpose.
+</p>
+
+<h2>Versioning and compatibility</h2>
+<p>Deliberately modest.</p>
+<ul>
+  <li>Within <code>/atproto/v1</code>, the meaning of an existing field does not
+      silently change.</li>
+  <li>New fields may be added. Do not assume the set of keys is closed; ignore
+      what you do not recognise.</li>
+  <li>Removing a field, or reinterpreting what one means, requires a new major
+      version at a new path, e.g. <code>/atproto/v2</code>.</li>
+  <li>The <code>contract</code> string in each response carries the same major
+      version as the path. Pin to it.</li>
+  <li>Any endpoint-specific exception to the above will be documented on this page.
+      There are currently none.</li>
+</ul>
+<p>
+  <code>/atproto/</code> is one namespace on a host that may carry unrelated APIs.
+  Nothing here claims the root, and paths outside <code>/atproto/</code> are not
+  part of this contract.
+</p>
+
+<h2>Corrections and supersession</h2>
+<p>
+  Instruments restate facts. A reducer gets fixed, or a window is recomputed as
+  late data arrives. There is no separate correction feed: a re-read of the same
+  endpoint returns the current best reading, and
+  <code>generated_at</code> tells you which computation you have.
+</p>
+<p>
+  For two responses describing the same <code>window</code>, the one with the later
+  <code>generated_at</code> supersedes the earlier. <code>ETag</code> changes
+  whenever the underlying artifact changes, so a <code>304</code> means nothing has
+  been restated since your last fetch. Facts are not immutable and should not be
+  cached indefinitely as though they were.
+</p>
+
+<h2>Errors</h2>
+<table>
+  <tr><th>Status</th><th>Meaning</th></tr>
+  <tr><td><code>304</code></td><td>Your <code>If-None-Match</code> matched; nothing has changed.</td></tr>
+  <tr><td><code>404</code></td><td>No such path.</td></tr>
+  <tr><td><code>405</code></td><td>You used a method other than GET or HEAD.</td></tr>
+  <tr><td><code>503</code></td>
+      <td>The instrument's artifact could not be read. This is absence of evidence,
+          not evidence that the instrument observed nothing.</td></tr>
+</table>
+
+<h2>Complete example response</h2>
+<p><code>GET https://api.neutral.zone/atproto/v1/labelwatch/overview</code></p>
+<pre><code>{
+  &quot;contract&quot;: &quot;atproto.facts.labelwatch.overview/v1&quot;,
+  &quot;instrument&quot;: &quot;labelwatch&quot;,
+  &quot;generated_at&quot;: &quot;2026-08-31T21:55:36.688627Z&quot;,
+  &quot;retrieved_at&quot;: &quot;2026-08-31T22:33:18Z&quot;,
+  &quot;age_seconds&quot;: 2261.526,
+  &quot;facts&quot;: {
+    &quot;labeler_count&quot;: 557,
+    &quot;alert_count_total&quot;: 117159,
+    &quot;alerts_by_rule_24h&quot;: {
+      &quot;churn_index&quot;: 239,
+      &quot;data_gap&quot;: 22,
+      &quot;flip_flop&quot;: 56,
+      &quot;label_rate_spike&quot;: 100,
+      &quot;target_concentration&quot;: 40
+    },
+    &quot;alerts_by_rule_7d&quot;: {
+      &quot;churn_index&quot;: 1863,
+      &quot;data_gap&quot;: 233,
+      &quot;flip_flop&quot;: 315,
+      &quot;label_rate_spike&quot;: 561,
+      &quot;target_concentration&quot;: 205
+    },
+    &quot;census&quot;: {
+      &quot;auditability&quot;: {
+        &quot;high&quot;: 135,
+        &quot;low&quot;: 1,
+        &quot;medium&quot;: 421
+      },
+      &quot;classification_confidence&quot;: {
+        &quot;high&quot;: 478,
+        &quot;low&quot;: 70,
+        &quot;medium&quot;: 9
+      },
+      &quot;reachability_state&quot;: {
+        &quot;accessible&quot;: 135,
+        &quot;auth_required&quot;: 114,
+        &quot;down&quot;: 226,
+        &quot;unknown&quot;: 82
+      },
+      &quot;visibility_class&quot;: {
+        &quot;declared&quot;: 556,
+        &quot;observed_only&quot;: 1
+      }
+    },
+    &quot;network_weather&quot;: {
+      &quot;signals&quot;: [
+        &quot;noisy&quot;,
+        &quot;conflicted&quot;,
+        &quot;churny&quot;,
+        &quot;under-observed&quot;
+      ],
+      &quot;attribution&quot;: &quot;100 rate-spike alerts (24h) \u00b7 168 surfaced moderation-conflict edges (7d) \u00b7 239 churn alerts (24h) \u00b7 3 of 135 labelers below 50% ingest coverage in the last 30m&quot;,
+      &quot;supports_negative_claim&quot;: false
+    },
+    &quot;observation&quot;: {
+      &quot;adequacy&quot;: &quot;partial&quot;,
+      &quot;reason&quot;: &quot;3 of 135 labelers below 50% ingest coverage in the last 30m&quot;,
+      &quot;window_minutes&quot;: 30,
+      &quot;coverage_threshold&quot;: 0.5,
+      &quot;labelers_attempted&quot;: 135,
+      &quot;labelers_adequate&quot;: 132,
+      &quot;labelers_degraded&quot;: 3,
+      &quot;labelers_accessible&quot;: 135,
+      &quot;labelers_unattempted&quot;: 0,
+      &quot;attempts&quot;: 405,
+      &quot;successes&quot;: 396,
+      &quot;last_attempt_ts&quot;: &quot;2026-08-31T21:59:07.716255Z&quot;,
+      &quot;last_success_ts&quot;: &quot;2026-08-31T21:59:07.716255Z&quot;
+    },
+    &quot;heartbeats&quot;: {
+      &quot;last_discovery_ok_ts&quot;: &quot;2026-08-31T17:09:03.952226Z&quot;,
+      &quot;last_ingest_ok_ts&quot;: &quot;2026-08-31T22:00:46.891092Z&quot;,
+      &quot;last_report_ok_ts&quot;: &quot;2026-08-31T20:55:36.588672Z&quot;,
+      &quot;last_scan_ok_ts&quot;: &quot;2026-08-31T21:59:06.687670Z&quot;
+    },
+    &quot;top_labelers_7d&quot;: [
+      {
+        &quot;labeler_did&quot;: &quot;did:plc:l37i5se642dgeb7kmrdwoqv4&quot;,
+        &quot;count&quot;: 145
+      },
+      {
+        &quot;labeler_did&quot;: &quot;did:plc:6ebfnuunfngxfw3rth3ewojw&quot;,
+        &quot;count&quot;: 140
+      },
+      {
+        &quot;labeler_did&quot;: &quot;did:plc:evt4kscdlzz5phrhyrihrnh2&quot;,
+        &quot;count&quot;: 130
+      },
+      {
+        &quot;labeler_did&quot;: &quot;did:plc:glu5zy2vxbuqwh76tjuwfqbm&quot;,
+        &quot;count&quot;: 124
+      },
+      {
+        &quot;labeler_did&quot;: &quot;did:plc:uyauirpjzk6le4ygqzatcwnq&quot;,
+        &quot;count&quot;: 121
+      },
+      {
+        &quot;labeler_did&quot;: &quot;did:plc:tcdl7e7zaswykasnmfp6watk&quot;,
+        &quot;count&quot;: 109
+      },
+      {
+        &quot;labeler_did&quot;: &quot;did:plc:bv3lcacietc6fkdokxfqtdkj&quot;,
+        &quot;count&quot;: 103
+      },
+      {
+        &quot;labeler_did&quot;: &quot;did:plc:756uwa72xp4hthse7njk7dl7&quot;,
+        &quot;count&quot;: 101
+      },
+      {
+        &quot;labeler_did&quot;: &quot;did:plc:myxjzrdb27gkjpkcqjazpiod&quot;,
+        &quot;count&quot;: 99
+      },
+      {
+        &quot;labeler_did&quot;: &quot;did:plc:cdkysjo2taj2jpy3qoostthu&quot;,
+        &quot;count&quot;: 80
+      }
+    ]
+  },
+  &quot;caveats&quot;: [
+    &quot;Counts are of Labelwatch&#x27;s own observations, not of everything that happened. A labeler Labelwatch could not reach contributes nothing.&quot;,
+    &quot;observation.adequacy qualifies the whole reading. When it is &#x27;partial&#x27; or &#x27;unobserved&#x27;, network_weather withholds negative claims such as &#x27;calm&#x27; and reports &#x27;under-observed&#x27; instead.&quot;,
+    &quot;supports_negative_claim is false when the observation window lacked the standing to assert that something did not happen.&quot;,
+    &quot;Labeler DIDs identify public moderation services, not people. No subject identities are published.&quot;
+  ],
+  &quot;provenance&quot;: {
+    &quot;instrument&quot;: &quot;labelwatch&quot;,
+    &quot;method&quot;: &quot;Polls known labeler endpoints, records per-labeler ingest outcomes, and derives alerts and an estate-level weather verdict from the observations it actually obtained.&quot;,
+    &quot;artifact_schema_version&quot;: 23,
+    &quot;timestamps_assumed_utc&quot;: false,
+    &quot;max_skew_seconds&quot;: 0
+  }
+}</code></pre>
+
+<h2>Machine-readable contract</h2>
+<p>
+  OpenAPI 3.1 at <a href="https://api.neutral.zone/atproto/openapi.json"><code>https://api.neutral.zone/atproto/openapi.json</code></a>.
+</p>
+
+<footer>
+  Aggregate observations of a public network, published as observed.
+  Coverage, freshness and adequacy are part of every fact — please carry them
+  through if you republish.
+</footer>
+
+</div>
+</body>
+</html>

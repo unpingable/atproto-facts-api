@@ -1,0 +1,133 @@
+{
+  "alert_count": 117159,
+  "alerts_by_rule_24h": {
+    "churn_index": 239,
+    "data_gap": 22,
+    "flip_flop": 56,
+    "label_rate_spike": 100,
+    "target_concentration": 40
+  },
+  "alerts_by_rule_7d": {
+    "churn_index": 1863,
+    "data_gap": 233,
+    "flip_flop": 315,
+    "label_rate_spike": 561,
+    "target_concentration": 205
+  },
+  "api_version": "v0",
+  "build_signature": {
+    "config_hash": "f9e30cceeb4910f7b102afa5c707aae22334c6b3cdba803bdeb9fd5d07586cc0",
+    "git_commit": "114aa41",
+    "package_version": "0.1.0",
+    "schema_version": 23
+  },
+  "census": {
+    "auditability": {
+      "high": 135,
+      "low": 1,
+      "medium": 421
+    },
+    "classification_confidence": {
+      "high": 478,
+      "low": 70,
+      "medium": 9
+    },
+    "reachability_state": {
+      "accessible": 135,
+      "auth_required": 114,
+      "down": 226,
+      "unknown": 82
+    },
+    "visibility_class": {
+      "declared": 556,
+      "observed_only": 1
+    }
+  },
+  "generated_at": "2026-08-31T21:55:36.688627Z",
+  "heartbeats": {
+    "last_discovery_ok_ts": "2026-08-31T17:09:03.952226Z",
+    "last_ingest_ok_ts": "2026-08-31T22:00:46.891092Z",
+    "last_report_ok_ts": "2026-08-31T20:55:36.588672Z",
+    "last_scan_ok_ts": "2026-08-31T21:59:06.687670Z"
+  },
+  "labeler_count": 557,
+  "last_discovery": "2026-08-31T17:09:03.941805Z",
+  "last_ingest": "2026-08-31T21:52:22.518371Z",
+  "last_scan": "2026-08-31T21:45:13.021005Z",
+  "max_raw_timestamp_seen": "2026-08-31T21:52:22.518371Z",
+  "max_skew_seconds": 0,
+  "naive_timestamp_count": 0,
+  "naive_timestamp_count_skipped": false,
+  "network_weather": {
+    "attribution": "100 rate-spike alerts (24h) \u00b7 168 surfaced moderation-conflict edges (7d) \u00b7 239 churn alerts (24h) \u00b7 3 of 135 labelers below 50% ingest coverage in the last 30m",
+    "signals": [
+      "noisy",
+      "conflicted",
+      "churny",
+      "under-observed"
+    ],
+    "supports_negative_claim": false
+  },
+  "now_clamped_to_real_time": false,
+  "observation": {
+    "adequacy": "partial",
+    "attempts": 405,
+    "coverage_threshold": 0.5,
+    "labelers_accessible": 135,
+    "labelers_adequate": 132,
+    "labelers_attempted": 135,
+    "labelers_degraded": 3,
+    "labelers_unattempted": 0,
+    "last_attempt_ts": "2026-08-31T21:59:07.716255Z",
+    "last_success_ts": "2026-08-31T21:59:07.716255Z",
+    "reason": "3 of 135 labelers below 50% ingest coverage in the last 30m",
+    "successes": 396,
+    "window_minutes": 30
+  },
+  "schema_version": 23,
+  "schema_version_source": "db",
+  "test_dev_count": 53,
+  "timestamps_assumed_utc": false,
+  "top_labelers_7d": [
+    {
+      "count": 145,
+      "labeler_did": "did:plc:l37i5se642dgeb7kmrdwoqv4"
+    },
+    {
+      "count": 140,
+      "labeler_did": "did:plc:6ebfnuunfngxfw3rth3ewojw"
+    },
+    {
+      "count": 130,
+      "labeler_did": "did:plc:evt4kscdlzz5phrhyrihrnh2"
+    },
+    {
+      "count": 124,
+      "labeler_did": "did:plc:glu5zy2vxbuqwh76tjuwfqbm"
+    },
+    {
+      "count": 121,
+      "labeler_did": "did:plc:uyauirpjzk6le4ygqzatcwnq"
+    },
+    {
+      "count": 109,
+      "labeler_did": "did:plc:tcdl7e7zaswykasnmfp6watk"
+    },
+    {
+      "count": 103,
+      "labeler_did": "did:plc:bv3lcacietc6fkdokxfqtdkj"
+    },
+    {
+      "count": 101,
+      "labeler_did": "did:plc:756uwa72xp4hthse7njk7dl7"
+    },
+    {
+      "count": 99,
+      "labeler_did": "did:plc:myxjzrdb27gkjpkcqjazpiod"
+    },
+    {
+      "count": 80,
+      "labeler_did": "did:plc:cdkysjo2taj2jpy3qoostthu"
+    }
+  ]
+}

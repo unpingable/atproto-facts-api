@@ -1,0 +1,44 @@
+[Unit]
+Description=ATProto Observability Facts API - public read-only publication service
+Documentation=https://api.neutral.zone/atproto/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=factsapi
+Group=factsapi
+WorkingDirectory=/opt/factsapi
+Environment=PYTHONPATH=/opt/factsapi/src
+Environment=PYTHONUNBUFFERED=1
+Environment=FACTSAPI_HOST=127.0.0.1
+Environment=FACTSAPI_PORT=8425
+Environment=FACTSAPI_LABELWATCH_OVERVIEW=/var/www/labelwatch/overview.json
+Environment=FACTSAPI_WEATHERWATCH_SUMMARY=/var/www/weatherwatch/summary.json
+ExecStart=/usr/bin/python3 -m factsapi.server
+Restart=always
+RestartSec=5
+
+# This service publishes other programs' output. It needs to read two files and
+# nothing else, and must never be able to affect the instruments it reads.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+ReadOnlyPaths=/opt/factsapi /var/www/labelwatch /var/www/weatherwatch
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

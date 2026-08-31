@@ -1,0 +1,585 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ATProto Observability Facts API",
+    "version": "1.0.0",
+    "summary": "Public, anonymous, read-only aggregate facts from independent ATProto observation instruments.",
+    "description": "Aggregate observations of the ATProto network, published as versioned facts.\n\nEvery fact carries the limits of the observation that produced it: coverage, freshness, and (for Labelwatch) observation adequacy. Absence of evidence is reported as absence, never as a confident zero.\n\nNo subject identities are published. Labeler DIDs are published because a labeler is a public moderation service, not a person.\n\nRead-only. GET and HEAD only. No authentication; none is accepted.",
+    "license": {
+      "name": "Open data, no warranty",
+      "identifier": "CC0-1.0"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.neutral.zone/atproto",
+      "description": "Public production surface"
+    }
+  ],
+  "tags": [
+    {
+      "name": "index",
+      "description": "What is published and whether it is currently readable."
+    },
+    {
+      "name": "labelwatch",
+      "description": "Labeler-behaviour observatory."
+    },
+    {
+      "name": "weatherwatch",
+      "description": "Aggregate network activity observatory."
+    },
+    {
+      "name": "service",
+      "description": "Service liveness. Not a fact contract."
+    }
+  ],
+  "paths": {
+    "/v1/instruments": {
+      "get": {
+        "tags": [
+          "index"
+        ],
+        "summary": "Which instruments contribute, and whether each is readable now",
+        "description": "Index of contributing instruments. An instrument whose artifact cannot be read is reported as UNAVAILABLE rather than omitted. Driftwatch is listed as NOT_PUBLISHED: it observes per-subject claim propagation and that state is deliberately private.",
+        "operationId": "v1_instruments",
+        "responses": {
+          "200": {
+            "description": "Facts as published.",
+            "headers": {
+              "ETag": {
+                "description": "Changes when the underlying artifact changes. Send back as If-None-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Modification time of the underlying artifact.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "public, max-age=60",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "contract": {
+                      "type": "string"
+                    },
+                    "retrieved_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "instruments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "instrument": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "PRESENT",
+                              "UNAVAILABLE",
+                              "NOT_PUBLISHED"
+                            ]
+                          },
+                          "generated_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time"
+                          },
+                          "endpoints": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "note": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified; your If-None-Match matched."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/SourceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/labelwatch/overview": {
+      "get": {
+        "tags": [
+          "labelwatch"
+        ],
+        "summary": "Estate-level labeler observations",
+        "description": "Counts of labelers and alerts, a census of labeler reachability and auditability, and an estate-level weather verdict. The observation block qualifies the whole reading: when adequacy is 'partial' or 'unobserved', the verdict withholds negative claims such as 'calm' and reports 'under-observed' instead.",
+        "operationId": "v1_labelwatch_overview",
+        "responses": {
+          "200": {
+            "description": "Facts as published.",
+            "headers": {
+              "ETag": {
+                "description": "Changes when the underlying artifact changes. Send back as If-None-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Modification time of the underlying artifact.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "public, max-age=60",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "contract": {
+                      "type": "string",
+                      "description": "Stable identifier for this fact contract, including its major version."
+                    },
+                    "instrument": {
+                      "type": "string",
+                      "description": "Which observation instrument produced the underlying facts."
+                    },
+                    "generated_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time",
+                      "description": "When the instrument produced the underlying artifact. Not when you fetched it."
+                    },
+                    "retrieved_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "When this service read the artifact to build the response."
+                    },
+                    "age_seconds": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "retrieved_at minus generated_at. How stale the facts are."
+                    },
+                    "facts": {
+                      "type": "object",
+                      "properties": {
+                        "labeler_count": {
+                          "type": "integer",
+                          "description": "Labelers known to Labelwatch, reachable or not."
+                        },
+                        "alert_count_total": {
+                          "type": "integer",
+                          "description": "All alerts ever recorded, not a rate."
+                        },
+                        "alerts_by_rule_24h": {
+                          "type": "object",
+                          "description": "Alert counts by rule over the last 24 hours."
+                        },
+                        "alerts_by_rule_7d": {
+                          "type": "object",
+                          "description": "Alert counts by rule over the last 7 days."
+                        },
+                        "census": {
+                          "type": "object",
+                          "description": "Distribution of labelers by reachability, auditability, visibility and classification confidence."
+                        },
+                        "network_weather": {
+                          "type": "object",
+                          "properties": {
+                            "signals": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "description": "Verdict vocabulary, e.g. noisy, churny, conflicted, degraded, calm, under-observed, unobserved."
+                            },
+                            "attribution": {
+                              "type": "string",
+                              "description": "Plain-language reason each signal fired."
+                            },
+                            "supports_negative_claim": {
+                              "type": "boolean",
+                              "description": "False when the window lacked standing to assert something did NOT happen."
+                            }
+                          }
+                        },
+                        "observation": {
+                          "type": "object",
+                          "description": "Observation adequacy: how much of the estate was actually observed in the window, and whether that supports a negative claim."
+                        },
+                        "heartbeats": {
+                          "type": "object",
+                          "description": "Last successful discovery, ingest, scan and report timestamps."
+                        },
+                        "top_labelers_7d": {
+                          "type": "array",
+                          "description": "Highest-volume labelers over 7 days. labeler_did identifies a public moderation service.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "labeler_did": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "caveats": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Limits that are part of the fact, not disclaimers. Read them."
+                    },
+                    "provenance": {
+                      "type": "object",
+                      "description": "How the instrument obtained these facts, and what it does not measure."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified; your If-None-Match matched."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/SourceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/weatherwatch/conditions": {
+      "get": {
+        "tags": [
+          "weatherwatch"
+        ],
+        "summary": "Current aggregate network conditions",
+        "description": "A plain-language reading of aggregate ATProto activity for the observation window, with the freshness and interval coverage that qualify it. Rates divide by observed duration, not nominal window width; unobserved windows are omitted, never interpolated.",
+        "operationId": "v1_weatherwatch_conditions",
+        "responses": {
+          "200": {
+            "description": "Facts as published.",
+            "headers": {
+              "ETag": {
+                "description": "Changes when the underlying artifact changes. Send back as If-None-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Modification time of the underlying artifact.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "public, max-age=60",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "contract": {
+                      "type": "string",
+                      "description": "Stable identifier for this fact contract, including its major version."
+                    },
+                    "instrument": {
+                      "type": "string",
+                      "description": "Which observation instrument produced the underlying facts."
+                    },
+                    "generated_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time",
+                      "description": "When the instrument produced the underlying artifact. Not when you fetched it."
+                    },
+                    "retrieved_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "When this service read the artifact to build the response."
+                    },
+                    "age_seconds": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "retrieved_at minus generated_at. How stale the facts are."
+                    },
+                    "facts": {
+                      "type": "object",
+                      "properties": {
+                        "conditions": {
+                          "type": "object",
+                          "description": "headline, label, plain-language sentence, state and confidence."
+                        },
+                        "window": {
+                          "type": "object",
+                          "description": "Observation interval, including coverage_ratio (observed_seconds / span_seconds)."
+                        },
+                        "total_events": {
+                          "type": "object",
+                          "description": "Total events observed and mean rate per second over observed duration."
+                        }
+                      }
+                    },
+                    "caveats": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Limits that are part of the fact, not disclaimers. Read them."
+                    },
+                    "provenance": {
+                      "type": "object",
+                      "description": "How the instrument obtained these facts, and what it does not measure."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified; your If-None-Match matched."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/SourceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/weatherwatch/metrics": {
+      "get": {
+        "tags": [
+          "weatherwatch"
+        ],
+        "summary": "Per-collection aggregate rates",
+        "description": "Event totals and mean rates per ATProto collection (posts, likes, follows, blocks, deletes, account and identity events), with observed and unobserved window counts so you can see how complete each rate is.",
+        "operationId": "v1_weatherwatch_metrics",
+        "responses": {
+          "200": {
+            "description": "Facts as published.",
+            "headers": {
+              "ETag": {
+                "description": "Changes when the underlying artifact changes. Send back as If-None-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Modification time of the underlying artifact.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "public, max-age=60",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "contract": {
+                      "type": "string",
+                      "description": "Stable identifier for this fact contract, including its major version."
+                    },
+                    "instrument": {
+                      "type": "string",
+                      "description": "Which observation instrument produced the underlying facts."
+                    },
+                    "generated_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time",
+                      "description": "When the instrument produced the underlying artifact. Not when you fetched it."
+                    },
+                    "retrieved_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "When this service read the artifact to build the response."
+                    },
+                    "age_seconds": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "retrieved_at minus generated_at. How stale the facts are."
+                    },
+                    "facts": {
+                      "type": "object",
+                      "properties": {
+                        "window": {
+                          "type": "object"
+                        },
+                        "collections": {
+                          "type": "object",
+                          "description": "Keyed by collection, e.g. 'post.create'. Each carries total, mean_rate_per_s, observed_seconds, observed_windows, unobserved_windows."
+                        },
+                        "total_events": {
+                          "type": "object"
+                        }
+                      }
+                    },
+                    "caveats": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Limits that are part of the fact, not disclaimers. Read them."
+                    },
+                    "provenance": {
+                      "type": "object",
+                      "description": "How the instrument obtained these facts, and what it does not measure."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified; your If-None-Match matched."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/SourceUnavailable"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "service"
+        ],
+        "summary": "Service liveness",
+        "description": "Whether this publication service is up. Says nothing about the instruments; use /v1/instruments for that.",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "Service is up.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "service": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "SourceUnavailable": {
+        "description": "The instrument artifact could not be read. This is absence of evidence, not evidence that the instrument observed nothing.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "No such path.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer"
+              },
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
