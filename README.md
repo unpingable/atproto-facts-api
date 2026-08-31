@@ -59,3 +59,13 @@ Production surface probes are opt-in:
 
 Python 3 standard library only at runtime. `pytest` for tests; `Pillow` only to
 regenerate the social card.
+
+## License
+
+Unless otherwise noted, this repository is licensed under MIT OR Apache-2.0,
+at your option. Contributions are accepted under the same terms.
+See [`LICENSE-MIT`](LICENSE-MIT) and [`LICENSE-APACHE`](LICENSE-APACHE).
+
+Published facts are aggregate observations of a public network. The licence
+above covers this source code; it makes no claim over the observed network
+itself.

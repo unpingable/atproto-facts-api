@@ -6,8 +6,8 @@
     "summary": "Public, anonymous, read-only aggregate facts from independent ATProto observation instruments.",
     "description": "Aggregate observations of the ATProto network, published as versioned facts.\n\nEvery fact carries the limits of the observation that produced it: coverage, freshness, and (for Labelwatch) observation adequacy. Absence of evidence is reported as absence, never as a confident zero.\n\nNo subject identities are published. Labeler DIDs are published because a labeler is a public moderation service, not a person.\n\nRead-only. GET and HEAD only. No authentication; none is accepted.",
     "license": {
-      "name": "Open data, no warranty",
-      "identifier": "CC0-1.0"
+      "name": "MIT OR Apache-2.0",
+      "identifier": "MIT OR Apache-2.0"
     }
   },
   "servers": [
