@@ -4,7 +4,7 @@
     "title": "ATProto Observability Facts API",
     "version": "1.0.0",
     "summary": "Public, anonymous, read-only aggregate facts from independent ATProto observation instruments.",
-    "description": "Aggregate observations of the ATProto network, published as versioned facts.\n\nEvery fact carries the limits of the observation that produced it: coverage, freshness, and (for Labelwatch) observation adequacy. Absence of evidence is reported as absence, never as a confident zero.\n\nNo subject identities are published. Labeler DIDs are published because a labeler is a public moderation service, not a person.\n\nRead-only. GET and HEAD only. No authentication; none is accepted.",
+    "description": "Aggregate observations of the ATProto network, published as versioned facts.\n\nEvery fact carries the limits of the observation that produced it: coverage, freshness, and (for Labelwatch) observation adequacy. Absence of evidence is reported as absence, never as a confident zero.\n\nNo subject identities are published. Labeler DIDs are published because a labeler is a public moderation service, not a person.\n\nRead-only. GET and HEAD retrieve resources; OPTIONS supports CORS preflight. POST, PUT, PATCH and DELETE return 405. HEAD has the same status and headers as GET with no body. Query parameters are ignored. No authentication; none is accepted.",
     "license": {
       "name": "MIT OR Apache-2.0",
       "identifier": "MIT OR Apache-2.0"
@@ -41,24 +41,12 @@
           "index"
         ],
         "summary": "Which instruments contribute, and whether each is readable now",
-        "description": "Index of contributing instruments. An instrument whose artifact cannot be read is reported as UNAVAILABLE rather than omitted. Driftwatch is listed as NOT_PUBLISHED: it observes per-subject claim propagation and that state is deliberately private.",
+        "description": "Index of contributing instruments. An instrument whose artifact cannot be read is reported as UNAVAILABLE rather than omitted. Driftwatch is listed as NOT_PUBLISHED: it observes per-subject claim propagation and that state is deliberately private. PRESENT means readable, not servable; Labelwatch freshness_state may still be stale, held or unavailable. This index has no ETag or Last-Modified and does not return 304.",
         "operationId": "v1_instruments",
         "responses": {
           "200": {
             "description": "Facts as published.",
             "headers": {
-              "ETag": {
-                "description": "Changes when the underlying artifact changes. Send back as If-None-Match.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Last-Modified": {
-                "description": "Modification time of the underlying artifact.",
-                "schema": {
-                  "type": "string"
-                }
-              },
               "Cache-Control": {
                 "description": "public, max-age=60",
                 "schema": {
@@ -109,6 +97,17 @@
                           },
                           "note": {
                             "type": "string"
+                          },
+                          "freshness_state": {
+                            "type": "string",
+                            "enum": [
+                              "fresh",
+                              "warming_up",
+                              "stale",
+                              "held",
+                              "unavailable"
+                            ],
+                            "description": "Labelwatch only, when its artifact is readable."
                           }
                         }
                       }
@@ -118,14 +117,8 @@
               }
             }
           },
-          "304": {
-            "description": "Not modified; your If-None-Match matched."
-          },
           "404": {
             "$ref": "#/components/responses/NotFound"
-          },
-          "503": {
-            "$ref": "#/components/responses/SourceUnavailable"
           }
         }
       }
@@ -136,14 +129,14 @@
           "labelwatch"
         ],
         "summary": "Estate-level labeler observations",
-        "description": "Counts of labelers and alerts, a census of labeler reachability and auditability, and an estate-level weather verdict. The observation block qualifies the whole reading: when adequacy is 'partial' or 'unobserved', the verdict withholds negative claims such as 'calm' and reports 'under-observed' instead.",
+        "description": "Estate-level Labelwatch facts. Two artifact schemas are accepted: the rolling-window epoch overview (labelwatch.recent-overview.v1: window_days, acquisition, coverage with warm-up and recorded gaps, event and labeler counts, top labelers over 7 days) and the legacy schema-23 overview (labeler/alert counts, census, weather verdict with observation adequacy). Either is served only while its freshness state is 'fresh' or 'warming_up'; a stale, held, absent, unreadable or malformed artifact answers 503 with Cache-Control: no-store, instructing caches not to store the refusal; clients must not substitute an older reading as current. Labelwatch records observed label application and removal events; current label state is unknown.",
         "operationId": "v1_labelwatch_overview",
         "responses": {
           "200": {
             "description": "Facts as published.",
             "headers": {
               "ETag": {
-                "description": "Changes when the underlying artifact changes. Send back as If-None-Match.",
+                "description": "Validator of artifact bytes and the response age bucket (one minute). Send back exactly as If-None-Match. Freshness refusal is evaluated first.",
                 "schema": {
                   "type": "string"
                 }
@@ -155,7 +148,7 @@
                 }
               },
               "Cache-Control": {
-                "description": "public, max-age=60",
+                "description": "public, max-age=60 (only for fresh or warming_up readings)",
                 "schema": {
                   "type": "string"
                 }
@@ -199,23 +192,27 @@
                       "properties": {
                         "labeler_count": {
                           "type": "integer",
-                          "description": "Labelers known to Labelwatch, reachable or not."
+                          "description": "Labelers known to Labelwatch (legacy schema 23), or labelers with at least one observation in the current window of this epoch (recent-overview.v1)."
                         },
                         "alert_count_total": {
-                          "type": "integer",
-                          "description": "All alerts ever recorded, not a rate."
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "deprecated": true,
+                          "description": "Legacy artifacts: all alerts ever recorded; recent-epoch artifacts: null, as is alert_count_window, because no alert pipeline runs there."
                         },
                         "alerts_by_rule_24h": {
                           "type": "object",
-                          "description": "Alert counts by rule over the last 24 hours."
+                          "description": "Alert counts by rule over the last 24 hours. Legacy schema-23 artifacts only."
                         },
                         "alerts_by_rule_7d": {
                           "type": "object",
-                          "description": "Alert counts by rule over the last 7 days."
+                          "description": "Alert counts by rule over the last 7 days. Legacy schema-23 artifacts only."
                         },
                         "census": {
                           "type": "object",
-                          "description": "Distribution of labelers by reachability, auditability, visibility and classification confidence."
+                          "description": "Distribution of labelers by reachability, auditability, visibility and classification confidence. Legacy schema-23 artifacts only."
                         },
                         "network_weather": {
                           "type": "object",
@@ -235,15 +232,16 @@
                               "type": "boolean",
                               "description": "False when the window lacked standing to assert something did NOT happen."
                             }
-                          }
+                          },
+                          "description": "Legacy schema-23 artifacts only."
                         },
                         "observation": {
                           "type": "object",
-                          "description": "Observation adequacy: how much of the estate was actually observed in the window, and whether that supports a negative claim."
+                          "description": "Observation adequacy: how much of the estate was actually observed in the window, and whether that supports a negative claim. Legacy schema-23 artifacts only."
                         },
                         "heartbeats": {
                           "type": "object",
-                          "description": "Last successful discovery, ingest, scan and report timestamps."
+                          "description": "Last successful discovery, ingest, scan and report timestamps. Legacy schema-23 artifacts only."
                         },
                         "top_labelers_7d": {
                           "type": "array",
@@ -259,6 +257,230 @@
                               }
                             }
                           }
+                        },
+                        "alert_count_window": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "Alerts recorded within the current window. Null when the artifact does not record alerts (the rolling epoch runs no alert pipeline)."
+                        },
+                        "window_days": {
+                          "type": "integer",
+                          "description": "Length of the rolling observation window in days, copied from the artifact. Present when the artifact declares it."
+                        },
+                        "acquisition": {
+                          "type": "object",
+                          "description": "When the current observation epoch began, by the local acceptance clock. Anything before started_at was not observed by this epoch.",
+                          "properties": {
+                            "generation_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "started_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "basis": {
+                              "type": "string",
+                              "enum": [
+                                "local_acceptance_clock"
+                              ]
+                            }
+                          }
+                        },
+                        "coverage": {
+                          "type": "object",
+                          "description": "Coverage of the window by this epoch. No recorded gaps does not prove complete source coverage.",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "warming_up",
+                                "gapped",
+                                "no_recorded_gaps",
+                                "unknown"
+                              ],
+                              "description": "unknown when the collector cannot establish coverage (sources unstarted, probing, refused, unavailable, order-unverified or undated-only); warm-up and gaps are still disclosed."
+                            },
+                            "observed_days": {
+                              "type": "integer",
+                              "description": "Whole days of the window observed since acquisition.started_at (capped at window_days)."
+                            },
+                            "observed_through": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "format": "date-time",
+                              "description": "Latest accepted observation."
+                            },
+                            "warmup": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "start": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "end": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "reason": {
+                                      "type": "string",
+                                      "enum": [
+                                        "not_observed",
+                                        "source_unavailable",
+                                        "ingest_paused",
+                                        "cursor_reset",
+                                        "maintenance",
+                                        "warmup",
+                                        "unknown"
+                                      ]
+                                    }
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "The part of the window before acquisition began (reason not_observed), or null once the window lies inside the epoch."
+                            },
+                            "gaps": {
+                              "type": "array",
+                              "maxItems": 128,
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "start": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "end": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "enum": [
+                                      "not_observed",
+                                      "source_unavailable",
+                                      "ingest_paused",
+                                      "cursor_reset",
+                                      "maintenance",
+                                      "warmup",
+                                      "unknown"
+                                    ]
+                                  }
+                                }
+                              },
+                              "description": "Recorded collection interruptions inside the window, with reasons."
+                            },
+                            "gap_overflow": {
+                              "type": "boolean",
+                              "description": "True when more gaps were recorded than can be listed; the whole window is then one 'unknown' gap."
+                            },
+                            "sources": {
+                              "type": "object",
+                              "description": "Source roster from the collector's bootstrap: enrolled = seeded + discovered; unstarted, probing and refused sources have unknown coverage (never quiet); established means positioned at the epoch, not complete. pre_epoch_skipped / undated_skipped count rows not stored because they were authored before the epoch or had no usable authored date. late_skipped counts rows authored more than 48 h before acceptance; cursor_order_unverified, undated_only and provider_rejects count sources whose page order could not be verified, that yielded only undated rows, or whose provider rejected requests; such sources have unknown coverage. unavailable counts sources currently failing transiently (retried with backoff).",
+                              "properties": {
+                                "seeded": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "description": "Sources from the epoch's initial roster seed; absent when unknown."
+                                },
+                                "unstarted": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "probing": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "established": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "refused": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "pre_epoch_skipped": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "undated_skipped": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "late_skipped": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "cursor_order_unverified": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "undated_only": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "provider_rejects": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "unavailable": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "future_skipped": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "description": "Present when the instrument exposes it."
+                                },
+                                "enrolled": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "description": "All enrolled sources (seeded + discovered)."
+                                },
+                                "discovered": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "description": "Sources enrolled later by discovery; absent when unknown."
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "counts": {
+                          "type": "object",
+                          "description": "Observed events and active labelers in this epoch (recent-overview.v1).",
+                          "properties": {
+                            "events_24h": {
+                              "type": "integer"
+                            },
+                            "events_7d": {
+                              "type": "integer"
+                            },
+                            "events_window": {
+                              "type": "integer"
+                            },
+                            "labelers_active_7d": {
+                              "type": "integer"
+                            },
+                            "labelers_active_window": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "current_label_state": {
+                          "type": "string",
+                          "enum": [
+                            "unknown"
+                          ],
+                          "description": "Observed application/removal events do not establish whether a label is currently active."
                         }
                       }
                     },
@@ -272,7 +494,102 @@
                     "provenance": {
                       "type": "object",
                       "description": "How the instrument obtained these facts, and what it does not measure."
+                    },
+                    "freshness": {
+                      "$ref": "#/components/schemas/LabelwatchFreshness"
                     }
+                  }
+                },
+                "example": {
+                  "contract": "atproto.facts.labelwatch.overview/v1",
+                  "instrument": "labelwatch",
+                  "generated_at": "2026-10-09T12:00:00.000000Z",
+                  "retrieved_at": "2026-10-09T12:01:00Z",
+                  "age_seconds": 60.0,
+                  "freshness": {
+                    "state": "warming_up",
+                    "age_seconds": 60.0,
+                    "basis": "artifact_generated_at",
+                    "max_age_seconds": 7200,
+                    "collection_age_seconds": 180.0,
+                    "collection_max_age_seconds": 7200
+                  },
+                  "facts": {
+                    "labeler_count": 97,
+                    "alert_count_total": null,
+                    "alert_count_window": null,
+                    "window_days": 30,
+                    "acquisition": {
+                      "generation_id": "0f3c2a8e-5b7d-4c1e-9a6f-2d8b4e7c1a90",
+                      "started_at": "2026-10-08T18:00:00.000000Z",
+                      "basis": "local_acceptance_clock"
+                    },
+                    "coverage": {
+                      "status": "unknown",
+                      "observed_days": 0,
+                      "observed_through": "2026-10-09T11:58:00.000000Z",
+                      "gap_overflow": false,
+                      "warmup": {
+                        "start": "2026-09-09T12:00:00.000000Z",
+                        "end": "2026-10-08T18:00:00.000000Z",
+                        "reason": "not_observed"
+                      },
+                      "gaps": [
+                        {
+                          "start": "2026-10-09T03:00:00.000000Z",
+                          "end": "2026-10-09T03:20:00.000000Z",
+                          "reason": "source_unavailable"
+                        }
+                      ],
+                      "sources": {
+                        "enrolled": 580,
+                        "seeded": 24,
+                        "discovered": 556,
+                        "unstarted": 120,
+                        "probing": 31,
+                        "established": 212,
+                        "refused": 217,
+                        "pre_epoch_skipped": 1834201,
+                        "undated_skipped": 12,
+                        "late_skipped": 4410,
+                        "cursor_order_unverified": 3,
+                        "undated_only": 2,
+                        "provider_rejects": 5,
+                        "unavailable": 7,
+                        "future_skipped": 9
+                      }
+                    },
+                    "counts": {
+                      "events_24h": 41234,
+                      "events_7d": 41234,
+                      "events_window": 41234,
+                      "labelers_active_7d": 97,
+                      "labelers_active_window": 97
+                    },
+                    "top_labelers_7d": [
+                      {
+                        "labeler_did": "did:plc:ar7c4by46qjdydhdevvrndac",
+                        "count": 30211
+                      },
+                      {
+                        "labeler_did": "did:plc:e4elbtctnfqocyfcml6h2lf7",
+                        "count": 5120
+                      }
+                    ],
+                    "current_label_state": "unknown"
+                  },
+                  "caveats": [
+                    "Counts cover only the current epoch's window; intervals before acquisition are not observed.",
+                    "Counts are of Labelwatch's own observations, not of everything that happened. A labeler Labelwatch could not reach contributes nothing.",
+                    "Recorded gaps are disclosed with a reason. No recorded gaps does not prove complete source coverage.",
+                    "Labelwatch records observed application and removal events; current label state is unknown.",
+                    "labeler_count counts labelers with at least one observation in the current window of this epoch.",
+                    "Labeler DIDs identify public moderation services, not people. No subject identities are published."
+                  ],
+                  "provenance": {
+                    "instrument": "labelwatch",
+                    "method": "Keeps a rolling window of label application and removal events observed from known labeler endpoints, stamped with the local acceptance clock; older observations expire.",
+                    "artifact_schema_version": "labelwatch.recent-overview.v1"
                   }
                 }
               }
@@ -285,9 +602,45 @@
             "$ref": "#/components/responses/NotFound"
           },
           "503": {
-            "$ref": "#/components/responses/SourceUnavailable"
+            "description": "The overview is not served as a current fact. error.code is 'source_stale' (publication age exceeds max_age_seconds or recent collection age exceeds collection_max_age_seconds), 'source_held' (the artifact declares hold:true) or 'source_unavailable' (absent, unreadable, malformed, unknown schema, or generated_at unusable). error.freshness carries the state when an artifact was read. Always Cache-Control: no-store.",
+            "headers": {
+              "Cache-Control": {
+                "description": "no-store",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FreshnessError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The service failed to build this fact (internal_error).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact ETag from a previous response, including quotes. If-Modified-Since is not evaluated."
+          }
+        ]
       }
     },
     "/v1/weatherwatch/conditions": {
@@ -296,14 +649,14 @@
           "weatherwatch"
         ],
         "summary": "Current aggregate network conditions",
-        "description": "A plain-language reading of aggregate ATProto activity for the observation window, with the freshness and interval coverage that qualify it. Rates divide by observed duration, not nominal window width; unobserved windows are omitted, never interpolated.",
+        "description": "A plain-language reading of aggregate ATProto activity for the observation window, with the freshness and interval coverage that qualify it. Rates divide by observed duration, not nominal window width; unobserved windows are omitted, never interpolated. Freshness is copied from the published Weatherwatch artifact; this API does not refuse readable Weatherwatch artifacts using Labelwatch freshness bounds.",
         "operationId": "v1_weatherwatch_conditions",
         "responses": {
           "200": {
             "description": "Facts as published.",
             "headers": {
               "ETag": {
-                "description": "Changes when the underlying artifact changes. Send back as If-None-Match.",
+                "description": "Validator of artifact bytes and the response age bucket (one minute). Send back exactly as If-None-Match. Freshness refusal is evaluated first.",
                 "schema": {
                   "type": "string"
                 }
@@ -395,8 +748,29 @@
           },
           "503": {
             "$ref": "#/components/responses/SourceUnavailable"
+          },
+          "500": {
+            "description": "The service failed to build this fact (internal_error).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact ETag from a previous response, including quotes. If-Modified-Since is not evaluated."
+          }
+        ]
       }
     },
     "/v1/weatherwatch/metrics": {
@@ -405,14 +779,14 @@
           "weatherwatch"
         ],
         "summary": "Per-collection aggregate rates",
-        "description": "Event totals and mean rates per ATProto collection (posts, likes, follows, blocks, deletes, account and identity events), with observed and unobserved window counts so you can see how complete each rate is.",
+        "description": "Event totals and mean rates per ATProto collection (posts, likes, follows, blocks, deletes, account and identity events), with observed and unobserved window counts so you can see how complete each rate is. Freshness is copied from the published Weatherwatch artifact; this API does not refuse readable Weatherwatch artifacts using Labelwatch freshness bounds.",
         "operationId": "v1_weatherwatch_metrics",
         "responses": {
           "200": {
             "description": "Facts as published.",
             "headers": {
               "ETag": {
-                "description": "Changes when the underlying artifact changes. Send back as If-None-Match.",
+                "description": "Validator of artifact bytes and the response age bucket (one minute). Send back exactly as If-None-Match. Freshness refusal is evaluated first.",
                 "schema": {
                   "type": "string"
                 }
@@ -502,8 +876,29 @@
           },
           "503": {
             "$ref": "#/components/responses/SourceUnavailable"
+          },
+          "500": {
+            "description": "The service failed to build this fact (internal_error).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact ETag from a previous response, including quotes. If-Modified-Since is not evaluated."
+          }
+        ]
       }
     },
     "/health": {
@@ -547,6 +942,14 @@
               "$ref": "#/components/schemas/Error"
             }
           }
+        },
+        "headers": {
+          "Cache-Control": {
+            "description": "no-store",
+            "schema": {
+              "type": "string"
+            }
+          }
         }
       },
       "NotFound": {
@@ -575,6 +978,82 @@
               },
               "message": {
                 "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "LabelwatchFreshness": {
+        "type": "object",
+        "description": "Freshness of the Labelwatch artifact, in the Weatherwatch envelope shape. fresh: age <= max_age_seconds and the window lies inside the epoch. warming_up: age <= max_age_seconds but the epoch is younger than the window (coverage.warmup set or observed_days < window_days). stale: age > max_age_seconds, or (recent epoch) collection_age_seconds > collection_max_age_seconds (basis collection_observed_through). held: the artifact declares hold:true. unavailable: absent, unreadable, malformed, of an unknown schema, or (recent epoch) without a usable coverage.observed_through (no accepted collector page yet, unparseable, or in the future). Only fresh and warming_up are served (200). Future timestamps more than 300 seconds ahead are unavailable. Publication freshness does not establish complete source coverage.",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "fresh",
+              "warming_up",
+              "stale",
+              "held",
+              "unavailable"
+            ]
+          },
+          "age_seconds": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Retrieval time minus the artifact's generated_at."
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "artifact_generated_at",
+              "collection_observed_through"
+            ],
+            "description": "artifact_generated_at: judged on the artifact's age. collection_observed_through: judged on the latest accepted collector page (recent epoch), which is stale or unavailable while collection has stalled or not started."
+          },
+          "max_age_seconds": {
+            "type": "integer",
+            "description": "Threshold for stale; default 7200, set by FACTSAPI_LABELWATCH_MAX_AGE_SECONDS."
+          },
+          "collection_age_seconds": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Recent epoch only: retrieval time minus coverage.observed_through (latest accepted collector page); null when no page has been accepted."
+          },
+          "collection_max_age_seconds": {
+            "type": "integer",
+            "description": "Recent epoch only: threshold for a stalled collection; defaults to max_age_seconds, set by FACTSAPI_LABELWATCH_COLLECTION_MAX_AGE_SECONDS."
+          }
+        }
+      },
+      "FreshnessError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "enum": [
+                  503
+                ]
+              },
+              "code": {
+                "type": "string",
+                "enum": [
+                  "source_stale",
+                  "source_held",
+                  "source_unavailable"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "freshness": {
+                "$ref": "#/components/schemas/LabelwatchFreshness"
               }
             }
           }
