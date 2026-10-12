@@ -88,15 +88,23 @@
   receiving a confident zero.
 </p>
 
-<h2>Quick start</h2>
-<pre><code>curl -s https://api.neutral.zone/atproto/v1/instruments
-curl -s https://api.neutral.zone/atproto/v1/labelwatch/overview
-curl -s https://api.neutral.zone/atproto/v1/weatherwatch/conditions
-curl -s https://api.neutral.zone/atproto/v1/weatherwatch/metrics</code></pre>
-<p>Conditional requests work; responses carry <code>ETag</code> and <code>Last-Modified</code>.</p>
-<pre><code>curl -s -H 'If-None-Match: "&lt;etag&gt;"' -o /dev/null -w '%{http_code}\n' \
-  https://api.neutral.zone/atproto/v1/labelwatch/overview
-# 304</code></pre>
+<nav aria-label="Documentation"><a href="#quickstart">Quick start</a> · <a href="#endpoints">Endpoints</a> · <a href="#freshness">Freshness and coverage</a> · <a href="#errors">Errors</a> · <a href="/atproto/openapi.json">OpenAPI 3.1</a></nav>
+
+<h2 id="quickstart">Quick start</h2>
+<pre><code>curl -sS -i https://api.neutral.zone/atproto/v1/instruments
+curl -sS -i https://api.neutral.zone/atproto/v1/labelwatch/overview
+curl -sS -i https://api.neutral.zone/atproto/v1/weatherwatch/conditions
+curl -sS -i https://api.neutral.zone/atproto/v1/weatherwatch/metrics</code></pre>
+<p>Inspect the HTTP status before using the JSON. No key or query parameters are needed.
+The instrument index reports readability; <code>PRESENT</code> does not guarantee that
+Labelwatch can serve a current reading. Check its <code>freshness_state</code>, then fetch the endpoint.</p>
+<p>Artifact-backed fact responses carry <code>ETag</code> and <code>Last-Modified</code>.
+Copy the ETag exactly, including its quotes, into <code>If-None-Match</code> on a later request.
+A matching validator returns <code>304</code> with no body; changed age buckets can produce a
+new validator even with unchanged artifact bytes. The index has no validators.
+<code>If-Modified-Since</code> is not evaluated by this service.</p>
+<pre><code>curl -sS -i -H 'If-None-Match: "COPY_ETAG_FROM_RESPONSE"' \
+  https://api.neutral.zone/atproto/v1/labelwatch/overview</code></pre>
 
 <h2>Contributing instruments</h2>
 <table>
@@ -106,8 +114,8 @@ curl -s https://api.neutral.zone/atproto/v1/weatherwatch/metrics</code></pre>
           collection, and the health of the observation itself.</td>
       <td>Yes</td></tr>
   <tr><td><strong>Labelwatch</strong></td>
-      <td>Labeler behaviour: which labelers exist, whether they are reachable and
-          auditable, and estate-level anomalies in their labelling.</td>
+      <td>Observed label application and removal events in a rolling epoch,
+          with acquisition time, source coverage and collection freshness.</td>
       <td>Yes</td></tr>
   <tr><td><strong>Driftwatch</strong></td>
       <td>Claim propagation, per subject.</td>
@@ -115,14 +123,16 @@ curl -s https://api.neutral.zone/atproto/v1/weatherwatch/metrics</code></pre>
           private. See <a href="#notpublished">what is not published</a>.</td></tr>
 </table>
 
-<h2>Endpoints</h2>
+<h2 id="endpoints">Endpoints</h2>
 <table>
   <tr><th>Path</th><th>Returns</th></tr>
   <tr><td><code>GET /atproto/v1/instruments</code></td>
       <td>Which instruments contribute and whether each is readable right now.</td></tr>
   <tr><td><code>GET /atproto/v1/labelwatch/overview</code></td>
-      <td>Labeler counts, reachability census, alert counts by rule, and the
-          estate-level weather verdict with its observation adequacy.</td></tr>
+      <td>Labeler activity in the current rolling 30-day epoch: acquisition time,
+          window coverage (warm-up and recorded gaps with reasons), event and
+          labeler counts, and the most active labelers over 7 days. Served only
+          while fresh or warming up; otherwise <code>503</code>.</td></tr>
   <tr><td><code>GET /atproto/v1/weatherwatch/conditions</code></td>
       <td>Plain-language reading of current aggregate activity, with freshness and
           interval coverage.</td></tr>
@@ -135,13 +145,14 @@ curl -s https://api.neutral.zone/atproto/v1/weatherwatch/metrics</code></pre>
       <td>Liveness of this publication service. Says nothing about the instruments.</td></tr>
 </table>
 <p>
-  <code>GET</code> and <code>HEAD</code> only. Anything else returns
-  <code>405</code>. There are no write, admin, or per-subject routes, and there is
+  <code>GET</code> and <code>HEAD</code> retrieve resources; <code>HEAD</code> omits the body.
+  <code>OPTIONS</code> returns <code>204</code> for CORS preflight.
+  <code>POST</code>, <code>PUT</code>, <code>PATCH</code> and <code>DELETE</code> return <code>405</code>. There are no write, admin, or per-subject routes, and there is
   nothing to authenticate as.
 </p>
 
 <h2>The response envelope</h2>
-<p>Every fact response has the same outer shape.</p>
+<p>The three instrument fact endpoints share this outer shape. The instruments index instead contains <code>contract</code>, <code>retrieved_at</code> and <code>instruments</code>.</p>
 <table>
   <tr><th>Field</th><th>Meaning</th></tr>
   <tr><td><code>contract</code></td>
@@ -165,8 +176,11 @@ curl -s https://api.neutral.zone/atproto/v1/weatherwatch/metrics</code></pre>
       <td>How the facts were obtained, and an explicit
           <code>does_not_measure</code> list where the instrument publishes one.</td></tr>
   <tr><td><code>freshness</code></td>
-      <td>Present on Weatherwatch responses: the instrument's own freshness state
-          and the threshold it was judged against.</td></tr>
+      <td>Present on Weatherwatch and Labelwatch responses: the freshness state
+          and the threshold it was judged against. Labelwatch states are
+          <code>fresh</code>, <code>warming_up</code> (served), and
+          <code>stale</code>, <code>held</code>, <code>unavailable</code>
+          (refused with <code>503</code>).</td></tr>
 </table>
 
 <h2>Time and window semantics</h2>
@@ -176,7 +190,7 @@ curl -s https://api.neutral.zone/atproto/v1/weatherwatch/metrics</code></pre>
 </p>
 <ul>
   <li><strong>Window</strong> — the interval the facts describe
-      (<code>facts.window.start</code> / <code>.end</code>). Aggregate counts and
+      (Weatherwatch: <code>facts.window.start</code> / <code>.end</code>; Labelwatch: <code>facts.window_days</code>, <code>facts.acquisition</code> and <code>facts.coverage</code>). Aggregate counts and
       rates belong to this interval and to no other.</li>
   <li><strong>generated_at</strong> — when the instrument computed the reading.</li>
   <li><strong>retrieved_at</strong> — when this API served it to you.</li>
@@ -188,10 +202,22 @@ curl -s https://api.neutral.zone/atproto/v1/weatherwatch/metrics</code></pre>
   interpolated across.
 </p>
 
-<h2>Coverage, adequacy and caveats</h2>
+<h2 id="freshness">Freshness, coverage and caveats</h2>
+<p>For Labelwatch, both artifact publication and accepted collection must be current.
+<code>freshness.age_seconds</code> measures artifact age; <code>collection_age_seconds</code>
+measures age of <code>facts.coverage.observed_through</code>. The default bounds are 7200 seconds,
+but use the response's <code>max_age_seconds</code> and <code>collection_max_age_seconds</code>.
+<code>basis</code> identifies the clock responsible for a refusal. A future timestamp more than
+300 seconds ahead or an unusable collection timestamp is unavailable.</p>
+<p><code>fresh</code> and <code>warming_up</code> permit a response; neither establishes complete
+coverage. Read <code>facts.coverage.status</code>, <code>observed_days</code>, <code>warmup</code>,
+<code>gaps</code> and <code>sources</code>. No recorded gaps does not prove complete source coverage.
+Rolling-epoch alert counts are <code>null</code> because no alert pipeline runs there, and
+<code>current_label_state</code> is <code>unknown</code>. Weatherwatch freshness is copied from
+its artifact; this API does not apply Labelwatch's refusal policy to Weatherwatch.</p>
 <p>This is the part worth reading before you use the numbers.</p>
 
-<h3>Coverage</h3>
+<h3>Weatherwatch coverage</h3>
 <p>
   <code>facts.window.coverage_ratio</code> is observed seconds divided by the span
   of the window. A ratio below 1 means the instrument was not watching for part of
@@ -199,7 +225,8 @@ curl -s https://api.neutral.zone/atproto/v1/weatherwatch/metrics</code></pre>
   occurred.
 </p>
 
-<h3>Observation adequacy (Labelwatch)</h3>
+<h3>Observation adequacy (legacy Labelwatch schema 23 only)</h3>
+<p>The rolling epoch does not publish the legacy observation or network_weather fields.</p>
 <p>
   <code>facts.observation.adequacy</code> is one of <code>adequate</code>,
   <code>partial</code>, or <code>unobserved</code>, and it qualifies the entire
@@ -285,155 +312,121 @@ curl -s https://api.neutral.zone/atproto/v1/weatherwatch/metrics</code></pre>
 <p>
   For two responses describing the same <code>window</code>, the one with the later
   <code>generated_at</code> supersedes the earlier. <code>ETag</code> changes
-  whenever the underlying artifact changes, so a <code>304</code> means nothing has
-  been restated since your last fetch. Facts are not immutable and should not be
+  whenever the underlying artifact changes, so a <code>304</code> means the current artifact-and-age-bucket validator matched. Freshness refusal is checked before a conditional response. Facts are not immutable and should not be
   cached indefinitely as though they were.
 </p>
 
-<h2>Errors</h2>
+<h2 id="errors">Errors</h2>
+<p>Errors use <code>{"error":{"status":503,"code":"source_unavailable","message":"…"}}</code>. Labelwatch freshness refusals also include <code>error.freshness</code>; missing or unreadable artifacts may omit it. Preserve the error instead of substituting zero counts or a prior successful reading.</p>
 <table>
   <tr><th>Status</th><th>Meaning</th></tr>
-  <tr><td><code>304</code></td><td>Your <code>If-None-Match</code> matched; nothing has changed.</td></tr>
+  <tr><td><code>304</code></td><td>Your <code>If-None-Match</code> matched; reuse your cached body within its stated limits.</td></tr>
   <tr><td><code>404</code></td><td>No such path.</td></tr>
-  <tr><td><code>405</code></td><td>You used a method other than GET or HEAD.</td></tr>
+  <tr><td><code>405</code></td><td>POST, PUT, PATCH or DELETE is unsupported; Allow lists GET, HEAD, OPTIONS.</td></tr>
   <tr><td><code>503</code></td>
-      <td>The instrument's artifact could not be read. This is absence of evidence,
-          not evidence that the instrument observed nothing.</td></tr>
+      <td>The instrument's artifact could not be read
+          (<code>source_unavailable</code>), or, for Labelwatch, it is older than
+          its freshness bound (<code>source_stale</code>) or the instrument is held
+          (<code>source_held</code>). Sent with <code>Cache-Control: no-store</code>.
+          This is absence of a current reading, not evidence that the instrument
+          observed nothing.</td></tr>
+<tr><td><code>500</code></td><td><code>internal_error</code>: the service could not build the fact.</td></tr>
 </table>
+<p>A missing documentation asset uses <code>503 asset_unavailable</code>; it does not carry the fact source no-store policy. Unknown paths use <code>404 not_found</code>.</p>
 
 <h2>Complete example response</h2>
 <p><code>GET https://api.neutral.zone/atproto/v1/labelwatch/overview</code></p>
+<p>Illustrative fixture at a fixed retrieval time, not a live reading.</p>
 <pre><code>{
   &quot;contract&quot;: &quot;atproto.facts.labelwatch.overview/v1&quot;,
   &quot;instrument&quot;: &quot;labelwatch&quot;,
-  &quot;generated_at&quot;: &quot;2026-08-31T21:55:36.688627Z&quot;,
-  &quot;retrieved_at&quot;: &quot;2026-08-31T22:33:18Z&quot;,
-  &quot;age_seconds&quot;: 2261.526,
+  &quot;generated_at&quot;: &quot;2026-10-09T12:00:00.000000Z&quot;,
+  &quot;retrieved_at&quot;: &quot;2026-10-09T12:01:00Z&quot;,
+  &quot;age_seconds&quot;: 60.0,
+  &quot;freshness&quot;: {
+    &quot;state&quot;: &quot;warming_up&quot;,
+    &quot;age_seconds&quot;: 60.0,
+    &quot;basis&quot;: &quot;artifact_generated_at&quot;,
+    &quot;max_age_seconds&quot;: 7200,
+    &quot;collection_age_seconds&quot;: 180.0,
+    &quot;collection_max_age_seconds&quot;: 7200
+  },
   &quot;facts&quot;: {
-    &quot;labeler_count&quot;: 557,
-    &quot;alert_count_total&quot;: 117159,
-    &quot;alerts_by_rule_24h&quot;: {
-      &quot;churn_index&quot;: 239,
-      &quot;data_gap&quot;: 22,
-      &quot;flip_flop&quot;: 56,
-      &quot;label_rate_spike&quot;: 100,
-      &quot;target_concentration&quot;: 40
+    &quot;labeler_count&quot;: 97,
+    &quot;alert_count_total&quot;: null,
+    &quot;alert_count_window&quot;: null,
+    &quot;window_days&quot;: 30,
+    &quot;acquisition&quot;: {
+      &quot;generation_id&quot;: &quot;0f3c2a8e-5b7d-4c1e-9a6f-2d8b4e7c1a90&quot;,
+      &quot;started_at&quot;: &quot;2026-10-08T18:00:00.000000Z&quot;,
+      &quot;basis&quot;: &quot;local_acceptance_clock&quot;
     },
-    &quot;alerts_by_rule_7d&quot;: {
-      &quot;churn_index&quot;: 1863,
-      &quot;data_gap&quot;: 233,
-      &quot;flip_flop&quot;: 315,
-      &quot;label_rate_spike&quot;: 561,
-      &quot;target_concentration&quot;: 205
-    },
-    &quot;census&quot;: {
-      &quot;auditability&quot;: {
-        &quot;high&quot;: 135,
-        &quot;low&quot;: 1,
-        &quot;medium&quot;: 421
+    &quot;coverage&quot;: {
+      &quot;status&quot;: &quot;unknown&quot;,
+      &quot;observed_days&quot;: 0,
+      &quot;observed_through&quot;: &quot;2026-10-09T11:58:00.000000Z&quot;,
+      &quot;gap_overflow&quot;: false,
+      &quot;warmup&quot;: {
+        &quot;start&quot;: &quot;2026-09-09T12:00:00.000000Z&quot;,
+        &quot;end&quot;: &quot;2026-10-08T18:00:00.000000Z&quot;,
+        &quot;reason&quot;: &quot;not_observed&quot;
       },
-      &quot;classification_confidence&quot;: {
-        &quot;high&quot;: 478,
-        &quot;low&quot;: 70,
-        &quot;medium&quot;: 9
-      },
-      &quot;reachability_state&quot;: {
-        &quot;accessible&quot;: 135,
-        &quot;auth_required&quot;: 114,
-        &quot;down&quot;: 226,
-        &quot;unknown&quot;: 82
-      },
-      &quot;visibility_class&quot;: {
-        &quot;declared&quot;: 556,
-        &quot;observed_only&quot;: 1
+      &quot;gaps&quot;: [
+        {
+          &quot;start&quot;: &quot;2026-10-09T03:00:00.000000Z&quot;,
+          &quot;end&quot;: &quot;2026-10-09T03:20:00.000000Z&quot;,
+          &quot;reason&quot;: &quot;source_unavailable&quot;
+        }
+      ],
+      &quot;sources&quot;: {
+        &quot;enrolled&quot;: 580,
+        &quot;seeded&quot;: 24,
+        &quot;discovered&quot;: 556,
+        &quot;unstarted&quot;: 120,
+        &quot;probing&quot;: 31,
+        &quot;established&quot;: 212,
+        &quot;refused&quot;: 217,
+        &quot;pre_epoch_skipped&quot;: 1834201,
+        &quot;undated_skipped&quot;: 12,
+        &quot;late_skipped&quot;: 4410,
+        &quot;cursor_order_unverified&quot;: 3,
+        &quot;undated_only&quot;: 2,
+        &quot;provider_rejects&quot;: 5,
+        &quot;unavailable&quot;: 7,
+        &quot;future_skipped&quot;: 9
       }
     },
-    &quot;network_weather&quot;: {
-      &quot;signals&quot;: [
-        &quot;noisy&quot;,
-        &quot;conflicted&quot;,
-        &quot;churny&quot;,
-        &quot;under-observed&quot;
-      ],
-      &quot;attribution&quot;: &quot;100 rate-spike alerts (24h) \u00b7 168 surfaced moderation-conflict edges (7d) \u00b7 239 churn alerts (24h) \u00b7 3 of 135 labelers below 50% ingest coverage in the last 30m&quot;,
-      &quot;supports_negative_claim&quot;: false
-    },
-    &quot;observation&quot;: {
-      &quot;adequacy&quot;: &quot;partial&quot;,
-      &quot;reason&quot;: &quot;3 of 135 labelers below 50% ingest coverage in the last 30m&quot;,
-      &quot;window_minutes&quot;: 30,
-      &quot;coverage_threshold&quot;: 0.5,
-      &quot;labelers_attempted&quot;: 135,
-      &quot;labelers_adequate&quot;: 132,
-      &quot;labelers_degraded&quot;: 3,
-      &quot;labelers_accessible&quot;: 135,
-      &quot;labelers_unattempted&quot;: 0,
-      &quot;attempts&quot;: 405,
-      &quot;successes&quot;: 396,
-      &quot;last_attempt_ts&quot;: &quot;2026-08-31T21:59:07.716255Z&quot;,
-      &quot;last_success_ts&quot;: &quot;2026-08-31T21:59:07.716255Z&quot;
-    },
-    &quot;heartbeats&quot;: {
-      &quot;last_discovery_ok_ts&quot;: &quot;2026-08-31T17:09:03.952226Z&quot;,
-      &quot;last_ingest_ok_ts&quot;: &quot;2026-08-31T22:00:46.891092Z&quot;,
-      &quot;last_report_ok_ts&quot;: &quot;2026-08-31T20:55:36.588672Z&quot;,
-      &quot;last_scan_ok_ts&quot;: &quot;2026-08-31T21:59:06.687670Z&quot;
+    &quot;counts&quot;: {
+      &quot;events_24h&quot;: 41234,
+      &quot;events_7d&quot;: 41234,
+      &quot;events_window&quot;: 41234,
+      &quot;labelers_active_7d&quot;: 97,
+      &quot;labelers_active_window&quot;: 97
     },
     &quot;top_labelers_7d&quot;: [
       {
-        &quot;labeler_did&quot;: &quot;did:plc:l37i5se642dgeb7kmrdwoqv4&quot;,
-        &quot;count&quot;: 145
+        &quot;labeler_did&quot;: &quot;did:plc:ar7c4by46qjdydhdevvrndac&quot;,
+        &quot;count&quot;: 30211
       },
       {
-        &quot;labeler_did&quot;: &quot;did:plc:6ebfnuunfngxfw3rth3ewojw&quot;,
-        &quot;count&quot;: 140
-      },
-      {
-        &quot;labeler_did&quot;: &quot;did:plc:evt4kscdlzz5phrhyrihrnh2&quot;,
-        &quot;count&quot;: 130
-      },
-      {
-        &quot;labeler_did&quot;: &quot;did:plc:glu5zy2vxbuqwh76tjuwfqbm&quot;,
-        &quot;count&quot;: 124
-      },
-      {
-        &quot;labeler_did&quot;: &quot;did:plc:uyauirpjzk6le4ygqzatcwnq&quot;,
-        &quot;count&quot;: 121
-      },
-      {
-        &quot;labeler_did&quot;: &quot;did:plc:tcdl7e7zaswykasnmfp6watk&quot;,
-        &quot;count&quot;: 109
-      },
-      {
-        &quot;labeler_did&quot;: &quot;did:plc:bv3lcacietc6fkdokxfqtdkj&quot;,
-        &quot;count&quot;: 103
-      },
-      {
-        &quot;labeler_did&quot;: &quot;did:plc:756uwa72xp4hthse7njk7dl7&quot;,
-        &quot;count&quot;: 101
-      },
-      {
-        &quot;labeler_did&quot;: &quot;did:plc:myxjzrdb27gkjpkcqjazpiod&quot;,
-        &quot;count&quot;: 99
-      },
-      {
-        &quot;labeler_did&quot;: &quot;did:plc:cdkysjo2taj2jpy3qoostthu&quot;,
-        &quot;count&quot;: 80
+        &quot;labeler_did&quot;: &quot;did:plc:e4elbtctnfqocyfcml6h2lf7&quot;,
+        &quot;count&quot;: 5120
       }
-    ]
+    ],
+    &quot;current_label_state&quot;: &quot;unknown&quot;
   },
   &quot;caveats&quot;: [
+    &quot;Counts cover only the current epoch&#x27;s window; intervals before acquisition are not observed.&quot;,
     &quot;Counts are of Labelwatch&#x27;s own observations, not of everything that happened. A labeler Labelwatch could not reach contributes nothing.&quot;,
-    &quot;observation.adequacy qualifies the whole reading. When it is &#x27;partial&#x27; or &#x27;unobserved&#x27;, network_weather withholds negative claims such as &#x27;calm&#x27; and reports &#x27;under-observed&#x27; instead.&quot;,
-    &quot;supports_negative_claim is false when the observation window lacked the standing to assert that something did not happen.&quot;,
+    &quot;Recorded gaps are disclosed with a reason. No recorded gaps does not prove complete source coverage.&quot;,
+    &quot;Labelwatch records observed application and removal events; current label state is unknown.&quot;,
+    &quot;labeler_count counts labelers with at least one observation in the current window of this epoch.&quot;,
     &quot;Labeler DIDs identify public moderation services, not people. No subject identities are published.&quot;
   ],
   &quot;provenance&quot;: {
     &quot;instrument&quot;: &quot;labelwatch&quot;,
-    &quot;method&quot;: &quot;Polls known labeler endpoints, records per-labeler ingest outcomes, and derives alerts and an estate-level weather verdict from the observations it actually obtained.&quot;,
-    &quot;artifact_schema_version&quot;: 23,
-    &quot;timestamps_assumed_utc&quot;: false,
-    &quot;max_skew_seconds&quot;: 0
+    &quot;method&quot;: &quot;Keeps a rolling window of label application and removal events observed from known labeler endpoints, stamped with the local acceptance clock; older observations expire.&quot;,
+    &quot;artifact_schema_version&quot;: &quot;labelwatch.recent-overview.v1&quot;
   }
 }</code></pre>
 
@@ -444,7 +437,7 @@ curl -s https://api.neutral.zone/atproto/v1/weatherwatch/metrics</code></pre>
 
 <footer>
   Aggregate observations of a public network, published as observed.
-  Coverage, freshness and adequacy are part of every fact — please carry them
+  Coverage, freshness and applicable observation limits qualify instrument facts — please carry them
   through if you republish.
   <br><br>
   Source: <a href="https://github.com/unpingable/atproto-facts-api">unpingable/atproto-facts-api</a>,
