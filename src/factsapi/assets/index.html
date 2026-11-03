@@ -132,7 +132,9 @@ new validator even with unchanged artifact bytes. The index has no validators.
       <td>Labeler activity in the current rolling 30-day epoch: acquisition time,
           window coverage (warm-up and recorded gaps with reasons), event and
           labeler counts, and the most active labelers over 7 days. Served only
-          while fresh or warming up; otherwise <code>503</code>.</td></tr>
+          while fresh or warming up; otherwise <code>503</code>. A gap reason of
+          <code>observed_then_lost</code> identifies observations from a previous
+          epoch whose record was lost; they are not included in current-epoch counts.</td></tr>
   <tr><td><code>GET /atproto/v1/weatherwatch/conditions</code></td>
       <td>Plain-language reading of current aggregate activity, with freshness and
           interval coverage.</td></tr>

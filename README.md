@@ -1,6 +1,6 @@
 # atproto-facts-api
 
-This documentation describes production runtime `f320f8e` and its public rolling-epoch contract. Runtime integration into the default branch is separate from this documentation update.
+This documentation describes deployed runtime `f320f8e` and the public rolling-epoch contract. This source includes its freshness checks and the predecessor-loss gap reference; selecting deployed source is a separate operation.
 
 A small, boring publication service. It serves public, anonymous, read-only
 aggregate facts from the ATProto observability instruments at

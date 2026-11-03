@@ -8,13 +8,14 @@ operational store.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from datetime import timezone
 from email.utils import formatdate
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import routes, sources
+from . import facts, routes, sources
 
 ASSET_DIR = os.environ.get(
     "FACTSAPI_ASSET_DIR",
@@ -29,6 +30,7 @@ CONTENT_TYPES = {
     ".png": "image/png",
 }
 SERVER_TOKEN = "atproto-facts-api"
+NO_STORE = {"Cache-Control": "no-store"}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -70,13 +72,16 @@ class Handler(BaseHTTPRequestHandler):
         body = json.dumps(payload, indent=2, sort_keys=False).encode("utf-8") + b"\n"
         self._send(status, body, CONTENT_TYPES[".json"], **kw)
 
-    def _error(self, status, code, message):
-        self._json(status, {"error": {"status": status, "code": code,
-                                      "message": message}})
+    def _error(self, status, code, message, *, freshness=None, extra=None):
+        error = {"status": status, "code": code, "message": message}
+        if freshness is not None:
+            error["freshness"] = freshness
+        self._json(status, {"error": error}, extra=extra)
 
-    def _not_modified(self, etag=None, last_modified=None):
+    def _not_modified(self, etag=None, last_modified=None, cache_control="public, max-age=60"):
         self.send_response(304)
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", cache_control)
         if etag:
             self.send_header("ETag", etag)
         self.send_header("Content-Length", "0")
@@ -150,13 +155,24 @@ class Handler(BaseHTTPRequestHandler):
             payload, art = routes.build_fact(key)
         except sources.SourceUnavailable as exc:
             # Absence of the artifact is reported as absence, not as a fact.
-            self._error(503, "source_unavailable", str(exc))
+            self._error(503, "source_unavailable", str(exc), extra=NO_STORE)
+            return
+        except facts.FreshnessRefused as exc:
+            # Stale, held or malformed: refuse, and forbid any cache from
+            # keeping an older 200 alive in its place.
+            self._error(503, exc.code, str(exc), freshness=exc.freshness, extra=NO_STORE)
             return
         except Exception:  # pragma: no cover - defensive
             self._error(500, "internal_error", "The service failed to build this fact.")
             return
 
-        etag = art.etag if art is not None else None
+        etag = None
+        if art is not None:
+            # The body carries age_seconds, so the validator changes with it
+            # (per minute) as well as with the artifact bytes.
+            age = payload.get("age_seconds")
+            bucket = "none" if age is None else str(int(age // 60))
+            etag = '"%s"' % hashlib.sha256((art.etag + ":" + bucket).encode()).hexdigest()[:32]
         if etag and self.headers.get("If-None-Match") == etag:
             self._not_modified(etag=etag)
             return

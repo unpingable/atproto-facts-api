@@ -1,0 +1,9 @@
+# Example drop-in for the Labelwatch rolling-observatory epoch; install as
+# /etc/systemd/system/factsapi.service.d/labelwatch-recent.conf and
+# daemon-reload + restart factsapi at cutover. It points the overview at the
+# successor's publication directory and keeps the legacy tree readable only
+# while it exists (the leading "-" tolerates its later retirement).
+[Service]
+Environment=FACTSAPI_LABELWATCH_OVERVIEW=/var/www/labelwatch-recent/overview.json
+ReadOnlyPaths=
+ReadOnlyPaths=/opt/factsapi /var/www/labelwatch-recent /var/www/weatherwatch -/var/www/labelwatch

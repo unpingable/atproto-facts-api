@@ -82,6 +82,10 @@ def build_instruments(now=None) -> dict:
         else:
             entry["state"] = "PRESENT"
             entry["generated_at"] = art.data.get("generated_at")
+            if name == "labelwatch":
+                # PRESENT means readable, not servable: the overview route
+                # answers 200 only for fresh or warming_up.
+                entry["freshness_state"] = facts.labelwatch_freshness(art.data, now)["state"]
         entries.append(entry)
 
     entries.append({

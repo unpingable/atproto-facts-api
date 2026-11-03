@@ -371,12 +371,13 @@
                                       "cursor_reset",
                                       "maintenance",
                                       "warmup",
-                                      "unknown"
+                                      "unknown",
+                                      "observed_then_lost"
                                     ]
                                   }
                                 }
                               },
-                              "description": "Recorded collection interruptions inside the window, with reasons."
+                              "description": "Recorded collection interruptions inside the window, with reasons. The reason observed_then_lost identifies an interval observed by a previous epoch whose record was lost; those observations are not included in current-epoch counts."
                             },
                             "gap_overflow": {
                               "type": "boolean",

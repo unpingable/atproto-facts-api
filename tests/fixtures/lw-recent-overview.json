@@ -1,0 +1,67 @@
+{
+  "acquisition": {
+    "basis": "local_acceptance_clock",
+    "generation_id": "0f3c2a8e-5b7d-4c1e-9a6f-2d8b4e7c1a90",
+    "started_at": "2026-10-08T18:00:00.000000Z"
+  },
+  "build_signature": "47a5651",
+  "counts": {
+    "events_24h": 41234,
+    "events_7d": 41234,
+    "events_window": 41234,
+    "labelers_active_7d": 97,
+    "labelers_active_window": 97
+  },
+  "coverage": {
+    "gap_overflow": false,
+    "gaps": [
+      {
+        "end": "2026-10-09T03:20:00.000000Z",
+        "reason": "source_unavailable",
+        "start": "2026-10-09T03:00:00.000000Z"
+      }
+    ],
+    "observed_days": 0,
+    "observed_through": "2026-10-09T11:58:00.000000Z",
+    "sources": {
+      "cursor_order_unverified": 3,
+      "discovered": 556,
+      "enrolled": 580,
+      "established": 212,
+      "future_skipped": 9,
+      "late_skipped": 4410,
+      "pre_epoch_skipped": 1834201,
+      "probing": 31,
+      "provider_rejects": 5,
+      "refused": 217,
+      "seeded": 24,
+      "unavailable": 7,
+      "undated_only": 2,
+      "undated_skipped": 12,
+      "unstarted": 120
+    },
+    "status": "unknown",
+    "warmup": {
+      "end": "2026-10-08T18:00:00.000000Z",
+      "reason": "not_observed",
+      "start": "2026-09-09T12:00:00.000000Z"
+    }
+  },
+  "generated_at": "2026-10-09T12:00:00.000000Z",
+  "hold": false,
+  "schema_version": "labelwatch.recent-overview.v1",
+  "state": {
+    "current_label_state": "unknown"
+  },
+  "top_labelers_7d": [
+    {
+      "count": 30211,
+      "labeler_did": "did:plc:ar7c4by46qjdydhdevvrndac"
+    },
+    {
+      "count": 5120,
+      "labeler_did": "did:plc:e4elbtctnfqocyfcml6h2lf7"
+    }
+  ],
+  "window_days": 30
+}
