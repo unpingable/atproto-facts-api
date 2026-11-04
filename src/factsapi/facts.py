@@ -323,7 +323,11 @@ def _labelwatch_recent(d, now, freshness) -> dict:
 def _weatherwatch_window(d) -> dict:
     interval = d.get("interval") or {}
     window = _pick(interval, "first_bucket_start", "last_bucket_end",
-                   "span_seconds", "observed_seconds", "coverage_ratio")
+                   "span_seconds", "observed_seconds", "coverage_ratio",
+                   "observed_seconds_lower", "observed_seconds_upper",
+                   "coverage_ratio_lower", "coverage_ratio_upper",
+                   "coverage_status", "recorded_observed_seconds",
+                   "multi_piece_buckets", "uncertain_buckets")
     for src, dst in (("first_bucket_start", "start"), ("last_bucket_end", "end")):
         val = interval.get(src)
         if isinstance(val, (int, float)):

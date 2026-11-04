@@ -221,10 +221,23 @@ its artifact; this API does not apply Labelwatch's refusal policy to Weatherwatc
 
 <h3>Weatherwatch coverage</h3>
 <p>
-  <code>facts.window.coverage_ratio</code> is observed seconds divided by the span
-  of the window. A ratio below 1 means the instrument was not watching for part of
-  the interval. Counts are of what was <em>observed</em>, never an estimate of what
-  occurred.
+  <code>facts.window.coverage_ratio</code> is observed wall-clock seconds divided
+  by the interval span. When overlapping partial observations cannot establish
+  an exact duration, <code>observed_seconds</code> and <code>coverage_ratio</code>
+  are <code>null</code>. Read <code>coverage_status</code> and the corresponding
+  <code>observed_seconds_lower</code>/<code>observed_seconds_upper</code> and
+  <code>coverage_ratio_lower</code>/<code>coverage_ratio_upper</code> bounds.
+  <code>bounded</code> reports that uncertainty; <code>exact</code> means the
+  bounds coincide, and <code>unavailable</code> means no interval basis exists.
+  Older artifacts can omit these additional fields.
+</p>
+<p>
+  <code>recorded_observed_seconds</code> preserves the sum of recorded durations,
+  which can exceed the span when observations overlap. It is not wall-clock
+  coverage. <code>multi_piece_buckets</code> and <code>uncertain_buckets</code>
+  disclose how many physical windows have multiple or unresolved pieces.
+  Counts remain observations, never estimates of what occurred. A coverage
+  fraction does not establish endpoint completeness or total-network coverage.
 </p>
 
 <h3>Observation adequacy (legacy Labelwatch schema 23 only)</h3>
